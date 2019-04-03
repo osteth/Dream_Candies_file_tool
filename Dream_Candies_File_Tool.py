@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[8]:
+# In[1]:
 
 
 #Setup
@@ -20,61 +20,89 @@ ROOT_P = os.path.abspath(os.curdir)
 Customer_P = ROOT_P + config['PATHS']['Customer']
 Invoice_P = ROOT_P + config['PATHS']['Invoice']
 Item_P = ROOT_P +config['PATHS']['Item']
+Customer_sample_P = ROOT_P +config['PATHS']['Customer_sample']
 Output_P = config['PATHS']['Output']
 
 #Get all of the file names from the config file.
-Unique_customer_N = config['FILENAMES']['Unique_customers']
-Full_N = config['FILENAMES']['Full']
+Customer_N = config['FILENAMES']['Customer']
+Invoice_N = config['FILENAMES']['Invoice']
+Item_N = config['FILENAMES']['Item']
+
+
+# In[2]:
 
 print('---------   Reading Input files from: -------------')
 print('Customer_P = ' + str(Customer_P))
 print('Invoice_P = ' + str(Invoice_P))
 print('Item_P = ' + str(Item_P))
+print('Customer_sample_P = ' + str(Customer_sample_P))
+
+
+# In[3]:
 
 print('--------- Loading Input files into dataframes -------------')
 Customer = pd.read_csv(Customer_P.replace('~$','')).replace('"', '')
 Invoice = pd.read_csv(Invoice_P.replace('~$','')).replace('"', '')
 Item = pd.read_csv(Item_P.replace('~$','')).replace('"', '')
+Customer_sample = pd.read_csv(Customer_sample_P.replace('~$','')).replace('"', '')
 
-print('--------- Merging Inputs -------------')
-'''Taking all three customer provided datasets and merging them together to create a single
-master dataframe that can be used to easily reformat, filter, or process to attain any dataset
-the customer could possibly want extracted from the data.  This takes a bit longer up front in terms
-of processor time to build this dataframe but makes things much easer in the long run.'''
-df = pd.merge(Customer, Invoice)
-merged = pd.merge(df, Item, on=['INVOICE_CODE'])
 
-#dropping the invoice totals column because we have line item prices and dont need to store that data.
-merged.rename(columns = {'AMOUNT_y':'AMOUNT'}, inplace = True)
-merged = merged.drop(['AMOUNT_x'], axis=1)
+# In[4]:
 
-#splitting off the customer sample data to its own dataframe to save it off for delivery
-Unique_customers = merged.drop_duplicates(subset=['CUSTOMER_CODE'])
-Unique_customers = pd.DataFrame(Unique_customers, columns = ['CUSTOMER_CODE'])
+Customer
 
-#Ensuring filepath exists to prevent errors
-path = pathlib.Path(ROOT_P + Output_P)
-path.parent.mkdir(parents=True, exist_ok=True)
 
-#Ensuring output filepath exists to prevent errors
-path = pathlib.Path(ROOT_P + Output_P + Unique_customer_N)
-path.parent.mkdir(parents=True, exist_ok=True)
+# In[5]:
+
+Invoice
+
+
+# In[6]:
+
+Item
+
+
+# In[7]:
+
+Customer_sample
+
+
+# In[8]:
+
+Customer_sample['CUSTOMER_CODE'].values
+
+
+# In[9]:
+
+sub_customer = Customer.loc[Customer['CUSTOMER_CODE'].isin(Customer_sample['CUSTOMER_CODE'].values)]
+
+
+# In[10]:
+
+sub_customer
+df = pd.merge(sub_customer, Invoice)
+sub_Invoice = df.drop(['FIRSTNAME', 'LASTNAME'], axis=1)
+df = sub_Invoice.drop(['CUSTOMER_CODE', 'AMOUNT', 'DATE'], axis=1)
+sub_Item = pd.merge(df, Item)
+
+
+# In[11]:
 
 print('--------- Writing to disk.... -------------')
+#Ensuring output filepath exists to prevent errors
+def Validatd_path(file_path):
+    path = pathlib.Path(file_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return(path)
 #Saving off the customer sample data. 
-Unique_customers.to_csv(ROOT_P + Output_P + Unique_customer_N, index=False, quotechar='"',
-                      quoting=csv.QUOTE_NONNUMERIC)
+sub_customer.to_csv(Validatd_path(ROOT_P + Output_P + Customer_N), index=False, quotechar='"',
+                      quoting=csv.QUOTE_ALL)
 
-'''Saving off the full merged dataframe.This will allow us to run this script to build and deliver the test set 
-and then we only have to load and filter the data to generate any deliverable instead of reprocessing anything. '''
+sub_Invoice.to_csv(Validatd_path(ROOT_P + Output_P + Invoice_N), index=False, quotechar='"',
+                      quoting=csv.QUOTE_ALL)
 
+sub_Item.to_csv(Validatd_path(ROOT_P + Output_P + Item_N), index=False, quotechar='"',
+                      quoting=csv.QUOTE_ALL)
 
-# Create today's date, to append to file
-todaysdatestring = str(datetime.datetime.today().strftime('%Y-%m-%d'))
-
-merged.to_csv(ROOT_P + Output_P + Full_N + todaysdatestring + '.csv.gz',
-      header=True,
-      index=False,
-      compression='gzip',)
 print("------------------------Action Completed!------------------------")
 
